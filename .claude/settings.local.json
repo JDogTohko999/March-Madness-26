@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \"from data_collection import collect_all_data; d = collect_all_data\\(\\); print\\(''public_pick_pct top 5:'', sorted\\(d[''public_pick_pct''].items\\(\\), key=lambda x: -x[1]\\)[:5]\\)\")"
+      "Bash(python -c \"from data_collection import collect_all_data; d = collect_all_data\\(\\); print\\(''public_pick_pct top 5:'', sorted\\(d[''public_pick_pct''].items\\(\\), key=lambda x: -x[1]\\)[:5]\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python kenpom_yahoo_analysis.py)",
+      "Bash(python pool_analysis_viz.py)",
+      "Bash(python main.py)"
     ]
   }
 }

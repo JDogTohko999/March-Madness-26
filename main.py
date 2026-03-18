@@ -24,7 +24,7 @@ from analysis import (
     OUTPUT_DIR,
 )
 
-POOL_SIZES = [10, 20, 50, 100, 500, 1000]
+POOL_SIZES = [10, 20, 50, 250]
 N_SIMS = 3000  # reduce for speed; increase to 5000+ for more stable results
 
 
