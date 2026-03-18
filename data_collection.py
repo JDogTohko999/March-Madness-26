@@ -1,12 +1,11 @@
 """
 Data collection for 2026 March Madness bracket optimization.
-Fetches public pick %, betting odds, and team ratings.
-Falls back to hardcoded data when sources are unavailable.
+Fetches public pick % from Yahoo Fantasy pick distribution,
+betting odds from hardcoded futures, and Barttorvik T-Rank ratings.
 """
 
 import requests
 from bs4 import BeautifulSoup
-import json
 import re
 import time
 
@@ -136,42 +135,72 @@ FUTURES_ODDS = {
     "Utah State":   10000,
 }
 
-# ESPN expert analyst picks (from ESPN 60-analyst poll, champion votes)
-# East: Duke dominant; West: Arizona ~50/60; Midwest: Michigan 31, Iowa State 21, Virginia 5, Alabama 1
-# South: estimated split (Florida dominant)
-ESPN_EXPERT_CHAMP_VOTES = {
-    "Duke":       28,   # East dominant
-    "Arizona":    17,   # ~50/60 on West
-    "Michigan":   10,   # 31 Midwest votes (scaled to ~60 total analysts picking champ)
-    "Iowa State":  7,   # 21 Midwest votes
-    "Florida":     8,   # South (estimated)
-    "Houston":     4,
-    "UConn":       2,
-    "Virginia":    2,   # 5 Midwest votes
-    "Purdue":      1,
-    "Alabama":     1,
+# Yahoo team key → our team name mapping
+# Derived from Yahoo's editorialTeamKey field in pick distribution data
+YAHOO_KEY_TO_TEAM = {
+    "ncaab.t.173": "Duke",
+    "ncaab.t.17":  "Arizona",
+    "ncaab.t.357": "Michigan",
+    "ncaab.t.210": "Florida",
+    "ncaab.t.254": "Houston",
+    "ncaab.t.129": "UConn",
+    "ncaab.t.277": "Iowa State",
+    "ncaab.t.474": "Purdue",
+    "ncaab.t.358": "Michigan State",
+    "ncaab.t.267": "Illinois",
+    "ncaab.t.233": "Gonzaga",
+    "ncaab.t.618": "Virginia",
+    "ncaab.t.400": "Nebraska",
+    "ncaab.t.6":   "Alabama",
+    "ncaab.t.287": "Kansas",
+    "ncaab.t.19":  "Arkansas",
+    "ncaab.t.615": "Vanderbilt",
+    "ncaab.t.534": "St. John's",
+    "ncaab.t.592": "Texas Tech",
+    "ncaab.t.657": "Wisconsin",
+    "ncaab.t.68":  "BYU",
+    "ncaab.t.606": "UCLA",
+    "ncaab.t.443": "Ohio St.",
+    "ncaab.t.367": "Missouri",
+    "ncaab.t.230": "Georgia",
+    "ncaab.t.314": "Louisville",
+    "ncaab.t.355": "Miami (FL)",
+    "ncaab.t.613": "VCU",
+    "ncaab.t.580": "Tennessee",
+    "ncaab.t.276": "Iowa",
+    "ncaab.t.617": "Villanova",
+    "ncaab.t.292": "Kentucky",
+    "ncaab.t.413": "North Carolina",
+    "ncaab.t.345": "McNeese",
+    "ncaab.t.418": "Northern Iowa",
+    "ncaab.t.611": "Utah State",
+    "ncaab.t.3":   "Akron",
+    "ncaab.t.120": "Clemson",
+    "ncaab.t.515": "SMU",
+    "ncaab.t.411": "NC State",
 }
-EXPERT_TOTAL = 60
 
-# ESPN public pick % (champion) - estimated from historical patterns + known data
-# These will be updated by live scraping if available
-ESPN_PUBLIC_CHAMP_PCT = {
-    "Duke":        0.28,
-    "Arizona":     0.22,
-    "Michigan":    0.14,
-    "Florida":     0.10,
-    "Houston":     0.07,
-    "Iowa State":  0.05,
-    "UConn":       0.04,
-    "Purdue":      0.03,
-    "Virginia":    0.02,
-    "Gonzaga":     0.02,
-    "Illinois":    0.01,
-    "Michigan State":0.01,
-    "Alabama":     0.01,
-    "Nebraska":    0.01,
-    "Arkansas":    0.005,
-    "St. John's":  0.005,
+# Fallback public pick % if Yahoo scraping fails (champion = round 6)
+YAHOO_FALLBACK_CHAMP_PCT = {
+    "Duke":          0.284,
+    "Arizona":       0.219,
+    "Michigan":      0.143,
+    "Florida":       0.063,
+    "Houston":       0.057,
+    "UConn":         0.030,
+    "Iowa State":    0.028,
+    "Purdue":        0.025,
+    "Virginia":      0.020,
+    "Gonzaga":       0.015,
+    "Michigan State":0.012,
+    "Illinois":      0.010,
+    "Alabama":       0.010,
+    "Nebraska":      0.008,
+    "Kansas":        0.007,
+    "Arkansas":      0.005,
+    "St. John's":    0.005,
+    "Texas Tech":    0.004,
+    "Wisconsin":     0.003,
 }
 
 
@@ -195,58 +224,63 @@ def get_betting_probs() -> dict:
     return remove_vig(raw)
 
 
-def fetch_espn_whopickedwhom() -> dict | None:
+def fetch_yahoo_pick_distribution() -> dict | None:
     """
-    Attempt to scrape ESPN Tournament Challenge 'Who Picked Whom' page.
-    Returns dict of {team: champion_pct} or None if unavailable.
+    Scrape Yahoo Fantasy pick distribution page.
+    Extracts all 6 rounds of pick percentages from the embedded App JSON.
+    Returns dict of {round_id: {team_name: percentage}} or None on failure.
+
+    Round IDs: 1=R64, 2=R32, 3=Sweet16, 4=Elite8, 5=FinalFour, 6=Champion
     """
-    url = "https://fantasy.espn.com/tournament-challenge-bracket/2026/en/whopickedwhom"
+    url = "https://tournament.fantasysports.yahoo.com/mens-basketball-bracket/pickdistribution"
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
+        resp = requests.get(url, headers=HEADERS, timeout=20)
         if resp.status_code != 200:
-            print(f"  ESPN WPW: HTTP {resp.status_code} — using fallback data")
+            print(f"  Yahoo pick dist: HTTP {resp.status_code} — using fallback")
             return None
-        # ESPN renders this page client-side via JS; static scrape may only get shell
-        # Try to find embedded JSON
-        text = resp.text
-        match = re.search(r'window\.__espnfitt__\s*=\s*(\{.+?\});', text, re.DOTALL)
-        if match:
-            data = json.loads(match.group(1))
-            # Navigate JSON to find pick percentages
-            # Structure varies by year; attempt common paths
-            picks = _parse_espn_fitt(data)
-            if picks:
-                print(f"  ESPN WPW: successfully parsed {len(picks)} teams")
-                return picks
-        print("  ESPN WPW: JS-rendered, no embedded JSON found — using fallback")
-        return None
-    except Exception as e:
-        print(f"  ESPN WPW error: {e} — using fallback")
-        return None
 
+        soup = BeautifulSoup(resp.text, "html.parser")
+        scripts = soup.find_all("script")
 
-def _parse_espn_fitt(data: dict) -> dict | None:
-    """Try to extract champion pick % from ESPN's __espnfitt__ JSON blob."""
-    try:
-        # Traverse likely paths
-        bracket_data = (
-            data.get("page", {})
-                .get("content", {})
-                .get("bracket", {})
+        # Find the large App script (~900KB+)
+        big = None
+        for s in scripts:
+            content = s.string or ""
+            if len(content) > 100000 and "pickDistribution" in content:
+                big = content
+                break
+
+        if not big:
+            print("  Yahoo pick dist: App script not found — using fallback")
+            return None
+
+        # Extract all round blocks
+        round_blocks = re.findall(
+            r'\{"roundId":"(\d+)","distributionByTeam":\[([^\]]+)\]', big
         )
-        if not bracket_data:
+        if not round_blocks:
+            print("  Yahoo pick dist: distributionByTeam not found — using fallback")
             return None
-        picks = {}
-        # Champion slot is typically the last round
-        for region_data in bracket_data.values():
-            if isinstance(region_data, dict) and "teams" in region_data:
-                for team in region_data["teams"]:
-                    name = team.get("name")
-                    pct = team.get("championPickPct") or team.get("pickPct")
-                    if name and pct is not None:
-                        picks[name] = float(pct) / 100.0
-        return picks if picks else None
-    except Exception:
+
+        results = {}
+        for round_id, teams_str in round_blocks:
+            entries = re.findall(
+                r'"editorialTeamKey":"(ncaab\.t\.\d+)","percentage":([\d.]+)', teams_str
+            )
+            round_data = {}
+            for key, pct in entries:
+                name = YAHOO_KEY_TO_TEAM.get(key)
+                if name:
+                    round_data[name] = float(pct) / 100.0
+            results[round_id] = round_data
+
+        n_champ = len(results.get("6", {}))
+        print(f"  Yahoo pick dist: scraped {len(round_blocks)} rounds, "
+              f"{n_champ} teams with champion pick data")
+        return results
+
+    except Exception as e:
+        print(f"  Yahoo pick dist error: {e} — using fallback")
         return None
 
 
@@ -300,10 +334,15 @@ def collect_all_data() -> dict:
     betting_probs = get_betting_probs()
     print(f"       {len(betting_probs)} teams with odds data")
 
-    # 2. Public pick percentages
-    print(" [2/3] Fetching public pick percentages...")
-    live_espn = fetch_espn_whopickedwhom()
-    public_pick_pct = live_espn if live_espn else ESPN_PUBLIC_CHAMP_PCT.copy()
+    # 2. Public pick percentages (Yahoo, round 6 = champion)
+    print(" [2/3] Fetching Yahoo public pick percentages...")
+    yahoo_data = fetch_yahoo_pick_distribution()
+    if yahoo_data and "6" in yahoo_data and yahoo_data["6"]:
+        public_pick_pct = yahoo_data["6"]
+        yahoo_all_rounds = yahoo_data
+    else:
+        public_pick_pct = YAHOO_FALLBACK_CHAMP_PCT.copy()
+        yahoo_all_rounds = {}
     # Normalize so they sum to 1
     total = sum(public_pick_pct.values())
     public_pick_pct = {k: v / total for k, v in public_pick_pct.items()}
@@ -326,9 +365,9 @@ def collect_all_data() -> dict:
         "teams": teams,
         "betting_probs": betting_probs,
         "public_pick_pct": public_pick_pct,
+        "yahoo_all_rounds": yahoo_all_rounds,
         "torvik": torvik or {},
         "futures_odds": FUTURES_ODDS,
-        "espn_expert_votes": ESPN_EXPERT_CHAMP_VOTES,
     }
 
 
