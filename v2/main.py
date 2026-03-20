@@ -109,7 +109,7 @@ def print_virginia_note(pool_results_nat: dict, pool_results_loc: dict,
     print("  This makes Virginia a WORSE pick locally because opponent correlation")
     print("  rises: if Virginia wins, many people in your local pool also have them.")
 
-    print(f"\n  {'Pool':>6}  {'National best':^22}  {'Local best':^22}  {'Δ'}")
+    print(f"\n  {'Pool':>6}  {'National best':^22}  {'Local best':^22}  Diff")
     print("  " + "-"*60)
     for ps in pool_sizes:
         nat_best = max(pool_results_nat.get(ps, {}).items(),

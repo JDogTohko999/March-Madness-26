@@ -1,0 +1,77 @@
+pool_size,team,pool_win_prob
+10,Duke,0.205
+10,Michigan,0.1998
+10,Arizona,0.202
+10,Florida,0.156
+10,Houston,0.1412
+10,Iowa State,0.139
+10,Illinois,0.1404
+10,Purdue,0.1338
+10,UConn,0.1182
+10,Michigan State,0.1232
+10,Gonzaga,0.1074
+10,Vanderbilt,0.0954
+10,Virginia,0.077
+10,Nebraska,0.0826
+10,Arkansas,0.0912
+10,SMU,0.031
+10,NC State,0.0232
+10,UMBC,0.02
+10,Lehigh,0.0236
+20,Duke,0.0898
+20,Michigan,0.1166
+20,Arizona,0.1126
+20,Florida,0.1008
+20,Houston,0.085
+20,Iowa State,0.0944
+20,Illinois,0.1046
+20,Purdue,0.083
+20,UConn,0.0622
+20,Michigan State,0.0666
+20,Gonzaga,0.058
+20,Vanderbilt,0.0468
+20,Virginia,0.0358
+20,Nebraska,0.0534
+20,Arkansas,0.0492
+20,SMU,0.0106
+20,NC State,0.0046
+20,UMBC,0.0048
+20,Lehigh,0.0064
+50,Duke,0.0328
+50,Michigan,0.0492
+50,Arizona,0.0384
+50,Florida,0.0552
+50,Houston,0.0526
+50,Iowa State,0.0648
+50,Illinois,0.0796
+50,Purdue,0.0544
+50,UConn,0.0388
+50,Michigan State,0.0362
+50,Gonzaga,0.0408
+50,Vanderbilt,0.0324
+50,Virginia,0.017
+50,Nebraska,0.0282
+50,Arkansas,0.0288
+50,SMU,0.0028
+50,NC State,0.0036
+50,UMBC,0.0002
+50,Lehigh,0.0006
+250,Duke,0.0042
+250,Michigan,0.0092
+250,Arizona,0.0058
+250,Florida,0.0184
+250,Houston,0.0144
+250,Iowa State,0.0414
+250,Illinois,0.0542
+250,Purdue,0.0248
+250,UConn,0.0192
+250,Michigan State,0.0252
+250,Gonzaga,0.0282
+250,Vanderbilt,0.0218
+250,Virginia,0.0068
+250,Nebraska,0.0246
+250,Arkansas,0.02
+250,SMU,0.0018
+250,NC State,0.0008
+250,UMBC,0.0
+250,Lehigh,0.0
